@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OpenSesame</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>OpenSesame</h1>
+            <p class="subtitle">Personalized cold outreach openers in seconds</p>
+        </header>
+
+        <form id="generate-form">
+            <div class="form-group">
+                <label for="urls">LinkedIn URLs <span class="hint">(one per line, max 10)</span></label>
+                <textarea id="urls" rows="4" placeholder="https://www.linkedin.com/in/example&#10;https://www.linkedin.com/in/another" required></textarea>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="tone">Tone</label>
+                    <select id="tone">
+                        <option value="professional">Professional</option>
+                        <option value="casual">Casual</option>
+                        <option value="witty">Witty</option>
+                        <option value="bold">Bold</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="research-depth">Research Depth</label>
+                    <select id="research-depth">
+                        <option value="light">Light (LinkedIn only)</option>
+                        <option value="medium" selected>Medium (+ web search)</option>
+                        <option value="deep">Deep (extensive research)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="char-limit">Char Limit</label>
+                    <input type="number" id="char-limit" value="300" min="50" max="1000">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="must-include">Must Include <span class="hint">(optional — product name, value prop, etc.)</span></label>
+                <input type="text" id="must-include" placeholder="e.g. our AI analytics platform">
+            </div>
+
+            <button type="submit" id="submit-btn">Generate Openers</button>
+        </form>
+
+        <div id="progress" class="progress hidden">
+            <div class="spinner"></div>
+            <span id="progress-text">Processing...</span>
+        </div>
+
+        <div id="results-section" class="hidden">
+            <div class="results-header">
+                <h2>Results</h2>
+                <button id="export-csv" class="btn-secondary">Export CSV</button>
+            </div>
+            <table id="results-table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Opener</th>
+                        <th>Source</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody id="results-body"></tbody>
+            </table>
+        </div>
+
+        <!-- Manual paste fallback modal -->
+        <div id="manual-modal" class="modal hidden">
+            <div class="modal-content">
+                <h3>Manual Profile Input Needed</h3>
+                <p id="manual-modal-desc">Scraping failed for some profiles. Paste profile text below to continue.</p>
+                <div id="manual-fields"></div>
+                <div class="modal-actions">
+                    <button id="manual-submit" class="btn-primary">Retry with Manual Data</button>
+                    <button id="manual-skip" class="btn-secondary">Skip These Profiles</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/app.js"></script>
+</body>
+</html>
