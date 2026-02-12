@@ -42,64 +42,36 @@ async def _rate_limit():
         await asyncio.sleep(settings.linkedin_rate_limit_delay)
 
 
-async def _scrape_proxycurl(url: str) -> tuple[ProfileData | None, str]:
-    """Tier 0: Proxycurl API — returns structured profile data directly."""
-    if not settings.proxycurl_api_key:
-        return None, "Proxycurl: No API key configured"
+async def _scrape_scrapfly(url: str) -> tuple[str | None, str]:
+    """Tier 0: Scrapfly API — returns rendered HTML."""
+    if not settings.scrapfly_api_key:
+        return None, "Scrapfly: No API key configured"
     try:
-        api_url = "https://nubela.co/proxycurl/api/v2/linkedin"
-        headers = {"Authorization": f"Bearer {settings.proxycurl_api_key}"}
-        params = {"linkedin_profile_url": url, "use_cache": "if-present"}
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            resp = await client.get(api_url, headers=headers, params=params)
-            if resp.status_code == 404:
-                return None, "Proxycurl: Profile not found"
-            if resp.status_code == 403:
-                return None, "Proxycurl: Invalid API key"
+        params = {
+            "key": settings.scrapfly_api_key,
+            "url": url,
+            "asp": "true",
+            "country": "US",
+            "headers[Accept-Language]": "en-US,en;q=0.5",
+        }
+        async with httpx.AsyncClient(timeout=155.0) as client:
+            resp = await client.get(
+                "https://api.scrapfly.io/scrape", params=params
+            )
+            if resp.status_code == 401:
+                return None, "Scrapfly: Invalid API key"
             if resp.status_code == 429:
-                return None, "Proxycurl: Rate limit / credits exhausted"
+                return None, "Scrapfly: Rate limit / credits exhausted"
             if resp.status_code != 200:
-                return None, f"Proxycurl: HTTP {resp.status_code}"
+                return None, f"Scrapfly: HTTP {resp.status_code}"
 
             data = resp.json()
-
-            # Build experience string
-            experience_parts = []
-            for exp in (data.get("experiences") or [])[:5]:
-                title = exp.get("title", "")
-                company = exp.get("company", "")
-                if title or company:
-                    experience_parts.append(f"{title} at {company}".strip(" at "))
-
-            # Build education string
-            edu_parts = []
-            for edu in (data.get("education") or [])[:3]:
-                school = edu.get("school", "")
-                degree = edu.get("degree_name", "")
-                field = edu.get("field_of_study", "")
-                parts = [p for p in [degree, field, school] if p]
-                if parts:
-                    edu_parts.append(", ".join(parts))
-
-            name = data.get("full_name", "")
-            if not name:
-                first = data.get("first_name", "")
-                last = data.get("last_name", "")
-                name = f"{first} {last}".strip()
-
-            profile = ProfileData(
-                url=url,
-                name=name,
-                headline=data.get("headline", "") or data.get("occupation", ""),
-                summary=data.get("summary", ""),
-                experience="; ".join(experience_parts),
-                education="; ".join(edu_parts),
-                skills="",
-                scrape_tier="proxycurl",
-            )
-            return profile, ""
+            html = data.get("result", {}).get("content", "")
+            if not html or len(html) < 500:
+                return None, "Scrapfly: Response too short (likely blocked)"
+            return html, ""
     except Exception as e:
-        reason = f"Proxycurl: {e}"
+        reason = f"Scrapfly: {e}"
         logger.info("%s for %s", reason, url)
         return None, reason
 
@@ -179,11 +151,14 @@ async def scrape_profile(
 
     fail_reasons = []
 
-    # Tier 0: Proxycurl (structured API — most reliable)
-    profile, reason = await _scrape_proxycurl(url)
-    if profile and profile.name:
-        return profile
-    if reason:
+    # Tier 0: Scrapfly (JS-rendered HTML — most reliable)
+    html, reason = await _scrape_scrapfly(url)
+    if html:
+        profile = parse_profile(html, url, tier="scrapfly")
+        if profile.name:
+            return profile
+        fail_reasons.append("Scrapfly: Got HTML but could not parse name")
+    elif reason:
         fail_reasons.append(reason)
 
     # Tier 1: httpx direct
