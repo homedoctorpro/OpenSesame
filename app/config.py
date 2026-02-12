@@ -3,6 +3,7 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     openai_api_key: str = ""
+    scraper_api_key: str = ""
     linkedin_rate_limit_delay: float = 3.0
     max_urls_per_batch: int = 10
 

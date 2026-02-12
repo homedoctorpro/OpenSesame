@@ -44,6 +44,36 @@ async def _rate_limit():
         await asyncio.sleep(settings.linkedin_rate_limit_delay)
 
 
+async def _scrape_scraperapi(url: str) -> tuple[str | None, str]:
+    """Tier 0: ScraperAPI with residential proxies. Returns (html, fail_reason)."""
+    if not settings.scraper_api_key:
+        return None, "ScraperAPI: No API key configured"
+    try:
+        api_url = "https://api.scraperapi.com"
+        params = {
+            "api_key": settings.scraper_api_key,
+            "url": url,
+            "render": "true",
+            "country_code": "us",
+        }
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            resp = await client.get(api_url, params=params)
+            if resp.status_code != 200:
+                reason = f"ScraperAPI: HTTP {resp.status_code}"
+                logger.info("%s for %s", reason, url)
+                return None, reason
+            html = resp.text
+            if "authwall" in html[:5000] and "login" in html[:5000]:
+                return None, "ScraperAPI: LinkedIn authwall in response"
+            if len(html) < 500:
+                return None, "ScraperAPI: Response too short"
+            return html, ""
+    except Exception as e:
+        reason = f"ScraperAPI: {e}"
+        logger.info("%s for %s", reason, url)
+        return None, reason
+
+
 async def _scrape_tier1(url: str) -> tuple[str | None, str]:
     """Tier 1: httpx with browser-like headers. Returns (html, fail_reason)."""
     try:
@@ -123,6 +153,16 @@ async def scrape_profile(
     await _rate_limit()
 
     fail_reasons = []
+
+    # Tier 0: ScraperAPI (residential proxy)
+    html, reason = await _scrape_scraperapi(url)
+    if html:
+        profile = parse_profile(html, url, tier="scraperapi")
+        if profile.name:
+            return profile
+        fail_reasons.append("ScraperAPI: Got HTML but could not parse name")
+    elif reason:
+        fail_reasons.append(reason)
 
     # Tier 1: httpx
     html, reason = await _scrape_tier1(url)
