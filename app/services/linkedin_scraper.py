@@ -42,40 +42,52 @@ async def _rate_limit():
         await asyncio.sleep(settings.linkedin_rate_limit_delay)
 
 
-async def _scrape_scrapfly(url: str) -> tuple[str | None, str]:
-    """Tier 0: Scrapfly API — returns rendered HTML."""
+async def _scrape_scrapfly(url: str, retries: int = 3) -> tuple[str | None, str]:
+    """Tier 0: Scrapfly API with JS rendering + ASP bypass."""
     if not settings.scrapfly_api_key:
         return None, "Scrapfly: No API key configured"
-    try:
-        params = {
-            "key": settings.scrapfly_api_key,
-            "url": url,
-            "asp": "true",
-            "country": "US",
-            "headers[Accept-Language]": "en-US,en;q=0.5",
-        }
-        async with httpx.AsyncClient(timeout=155.0) as client:
-            resp = await client.get(
-                "https://api.scrapfly.io/scrape", params=params
-            )
-            data = resp.json()
 
-            if resp.status_code != 200:
-                error = data.get("result", {}).get("error", {})
-                code = error.get("code", "")
-                msg = error.get("message", resp.status_code)
-                reason = f"Scrapfly: {code} - {msg}"
-                logger.warning("%s for %s", reason, url)
-                return None, reason
+    params = {
+        "key": settings.scrapfly_api_key,
+        "url": url,
+        "asp": "true",
+        "render_js": "true",
+        "country": "US",
+        "headers[Accept-Language]": "en-US,en;q=0.5",
+    }
+    last_reason = ""
+    async with httpx.AsyncClient(timeout=155.0) as client:
+        for attempt in range(retries):
+            try:
+                resp = await client.get(
+                    "https://api.scrapfly.io/scrape", params=params
+                )
+                data = resp.json()
 
-            html = data.get("result", {}).get("content", "")
-            if not html or len(html) < 500:
-                return None, "Scrapfly: Response too short (likely blocked)"
-            return html, ""
-    except Exception as e:
-        reason = f"Scrapfly: {e}"
-        logger.info("%s for %s", reason, url)
-        return None, reason
+                if resp.status_code != 200:
+                    error = data.get("result", {}).get("error", {})
+                    code = error.get("code", "")
+                    msg = error.get("message", resp.status_code)
+                    retryable = error.get("retryable", False)
+                    last_reason = f"Scrapfly: {code} - {msg}"
+                    logger.warning("%s for %s (attempt %d)", last_reason, url, attempt + 1)
+                    if retryable and attempt < retries - 1:
+                        await asyncio.sleep(3)
+                        continue
+                    return None, last_reason
+
+                html = data.get("result", {}).get("content", "")
+                if not html or len(html) < 500:
+                    return None, "Scrapfly: Response too short (likely blocked)"
+                return html, ""
+            except Exception as e:
+                last_reason = f"Scrapfly: {e}"
+                logger.info("%s for %s (attempt %d)", last_reason, url, attempt + 1)
+                if attempt < retries - 1:
+                    await asyncio.sleep(3)
+                    continue
+                return None, last_reason
+    return None, last_reason
 
 
 async def _scrape_tier1(url: str) -> tuple[str | None, str]:
