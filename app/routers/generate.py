@@ -27,10 +27,11 @@ async def _process_single(
             profile = await scrape_profile(url, manual_text=manual_text)
 
             if profile.scrape_tier == "failed":
+                detail = profile.raw_text or "All scraping tiers failed"
                 return OpenerResult(
                     url=url,
                     scrape_tier="failed",
-                    error="Could not scrape profile. Please provide profile text manually.",
+                    error=f"Scrape failed: {detail}. Please paste profile text manually.",
                 )
 
             # Step 2: Web research (concurrent with nothing — profile is needed first)

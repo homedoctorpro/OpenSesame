@@ -44,8 +44,8 @@ async def _rate_limit():
         await asyncio.sleep(settings.linkedin_rate_limit_delay)
 
 
-async def _scrape_tier1(url: str) -> str | None:
-    """Tier 1: httpx with browser-like headers."""
+async def _scrape_tier1(url: str) -> tuple[str | None, str]:
+    """Tier 1: httpx with browser-like headers. Returns (html, fail_reason)."""
     try:
         async with httpx.AsyncClient(
             headers=BROWSER_HEADERS,
@@ -54,28 +54,30 @@ async def _scrape_tier1(url: str) -> str | None:
         ) as client:
             resp = await client.get(url)
             if resp.status_code != 200:
-                logger.info("Tier 1 failed: status %d for %s", resp.status_code, url)
-                return None
+                reason = f"Tier 1: HTTP {resp.status_code}"
+                logger.info("%s for %s", reason, url)
+                return None, reason
             html = resp.text
             # Check for authwall
             if "authwall" in resp.url.path or "login" in resp.url.path:
-                logger.info("Tier 1 hit authwall for %s", url)
-                return None
+                reason = "Tier 1: LinkedIn authwall redirect (cloud IP blocked)"
+                logger.info("%s for %s", reason, url)
+                return None, reason
             if len(html) < 500:
-                return None
-            return html
+                return None, "Tier 1: Response too short (likely blocked)"
+            return html, ""
     except Exception as e:
-        logger.info("Tier 1 exception for %s: %s", url, e)
-        return None
+        reason = f"Tier 1: {e}"
+        logger.info("%s for %s", reason, url)
+        return None, reason
 
 
-async def _scrape_tier2(url: str) -> str | None:
-    """Tier 2: Playwright headless Chromium."""
+async def _scrape_tier2(url: str) -> tuple[str | None, str]:
+    """Tier 2: Playwright headless Chromium. Returns (html, fail_reason)."""
     try:
         from playwright.async_api import async_playwright
     except ImportError:
-        logger.info("Playwright not installed, skipping Tier 2")
-        return None
+        return None, "Tier 2: Playwright not installed"
 
     try:
         async with async_playwright() as p:
@@ -96,16 +98,16 @@ async def _scrape_tier2(url: str) -> str | None:
             current_url = page.url
             if "authwall" in current_url or "login" in current_url:
                 await browser.close()
-                logger.info("Tier 2 hit authwall for %s", url)
-                return None
+                return None, "Tier 2: LinkedIn authwall redirect"
             html = await page.content()
             await browser.close()
             if len(html) < 500:
-                return None
-            return html
+                return None, "Tier 2: Response too short"
+            return html, ""
     except Exception as e:
-        logger.info("Tier 2 exception for %s: %s", url, e)
-        return None
+        reason = f"Tier 2: {e}"
+        logger.info("%s for %s", reason, url)
+        return None, reason
 
 
 async def scrape_profile(
@@ -120,19 +122,28 @@ async def scrape_profile(
 
     await _rate_limit()
 
+    fail_reasons = []
+
     # Tier 1: httpx
-    html = await _scrape_tier1(url)
+    html, reason = await _scrape_tier1(url)
     if html:
         profile = parse_profile(html, url, tier="tier1")
         if profile.name:
             return profile
+        fail_reasons.append("Tier 1: Got HTML but could not parse name")
+    elif reason:
+        fail_reasons.append(reason)
 
     # Tier 2: Playwright
-    html = await _scrape_tier2(url)
+    html, reason = await _scrape_tier2(url)
     if html:
         profile = parse_profile(html, url, tier="tier2")
         if profile.name:
             return profile
+        fail_reasons.append("Tier 2: Got HTML but could not parse name")
+    elif reason:
+        fail_reasons.append(reason)
 
     # Tier 3: Return empty profile — frontend will show manual paste fallback
-    return ProfileData(url=url, scrape_tier="failed")
+    detail = " → ".join(fail_reasons) if fail_reasons else "All tiers failed"
+    return ProfileData(url=url, scrape_tier="failed", raw_text=detail)
