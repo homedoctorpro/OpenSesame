@@ -58,14 +58,16 @@ async def _scrape_scrapfly(url: str) -> tuple[str | None, str]:
             resp = await client.get(
                 "https://api.scrapfly.io/scrape", params=params
             )
-            if resp.status_code == 401:
-                return None, "Scrapfly: Invalid API key"
-            if resp.status_code == 429:
-                return None, "Scrapfly: Rate limit / credits exhausted"
-            if resp.status_code != 200:
-                return None, f"Scrapfly: HTTP {resp.status_code}"
-
             data = resp.json()
+
+            if resp.status_code != 200:
+                error = data.get("result", {}).get("error", {})
+                code = error.get("code", "")
+                msg = error.get("message", resp.status_code)
+                reason = f"Scrapfly: {code} - {msg}"
+                logger.warning("%s for %s", reason, url)
+                return None, reason
+
             html = data.get("result", {}).get("content", "")
             if not html or len(html) < 500:
                 return None, "Scrapfly: Response too short (likely blocked)"
