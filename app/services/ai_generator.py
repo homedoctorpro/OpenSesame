@@ -17,8 +17,9 @@ personalized cold outreach opening lines. Your openers are:
 RULES:
 - Pick the SINGLE most interesting or surprising detail you can find — a recent company \
 milestone, a personal post, an unusual career move, a specific project. Generic observations kill reply rates.
-- NEVER reference shared tools, platforms, or tech stacks as the main hook (e.g. "fellow \
-Recharge user" or "I see you also use Shipstation") — dig deeper for something unique.
+- AVOID referencing shared tools, platforms, or tech stacks as the main hook (e.g. "fellow \
+Recharge user") — dig deeper for something unique. EXCEPTION: if the user explicitly asks \
+you to include a platform/tool via MUST INCLUDE, weave it in naturally alongside a specific detail.
 - NEVER start with "I noticed..." or "I came across..." — these are overused and ignored
 - NEVER use buzzwords like "synergy", "leverage", "game-changer", "cutting-edge"
 - NEVER be sycophantic or over-the-top flattering
@@ -69,7 +70,10 @@ def _build_user_prompt(
     parts.append(f"\nTONE: {tone}")
     parts.append(f"MAX CHARACTERS: {char_limit}")
     if must_include:
-        parts.append(f"MUST INCLUDE: {must_include}")
+        parts.append(
+            f"MUST INCLUDE (mandatory — override any conflicting style rules): "
+            f"{must_include}"
+        )
 
     parts.append(
         "\nWrite a single personalized cold outreach opener for this prospect. "
