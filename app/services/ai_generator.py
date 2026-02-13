@@ -22,17 +22,24 @@ Recharge user") — dig deeper for something unique. EXCEPTION: if the user expl
 you to include a platform/tool via MUST INCLUDE, weave it in naturally alongside a specific detail.
 - NEVER start with "I noticed..." or "I came across..." — these are overused and ignored
 - NEVER use buzzwords like "synergy", "leverage", "game-changer", "cutting-edge"
-- NEVER be sycophantic or over-the-top flattering
+- NEVER be sycophantic or flattering — no "truly inspiring", "incredible journey", "amazing", \
+"impressive". Write like a peer, not a fan. Sound like a smart colleague who did their homework, \
+not someone trying to butter them up.
+- NEVER use exclamation marks
 - NEVER mention that you researched them
 - DO reference specific details: a recent role change, a project, a post they wrote, a company milestone
 - DO match the requested tone
 - Prioritize recent company news, personal posts, or unique career moves over generic profile facts
 - Output ONLY the opener text — no quotes, no labels, no explanation
 
+BAD example (sycophantic): "Your journey from personal struggle with PCOS to founding MyOva \
+is truly inspiring, especially how you're advocating for women's hormonal health. Balancing \
+that mission with scaling your brand must be both challenging and rewarding!"
 BAD example (generic): "Running ops at a growing DTC brand while juggling Recharge and \
 Shipstation — that's no small feat."
-GOOD example (specific): "MyOva just landed that Innovate UK grant for the PCOS home-testing \
-kit — scaling clinical validation and DTC ops at the same time must be a wild ride."
+GOOD example (specific, casual): "MyOva just landed that Innovate UK grant for the PCOS \
+home-testing kit — curious how you're thinking about scaling DTC ops alongside the clinical \
+validation side."
 """
 
 
