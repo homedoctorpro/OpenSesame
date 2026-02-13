@@ -25,6 +25,14 @@ async def _search_async(query: str, max_results: int = 3) -> ResearchResult:
     return ResearchResult(query=query, snippets=snippets)
 
 
+def _extract_company(headline: str) -> str:
+    """Extract company name from common LinkedIn headline patterns."""
+    for sep in [" at ", " @ ", " | "]:
+        if sep in headline:
+            return headline.split(sep, 1)[1].strip()
+    return ""
+
+
 def _build_queries(profile: ProfileData, depth: str) -> list[str]:
     name = profile.name.strip()
     headline = profile.headline.strip()
@@ -34,6 +42,8 @@ def _build_queries(profile: ProfileData, depth: str) -> list[str]:
     if depth == "light":
         return []
 
+    company = _extract_company(headline) if headline else ""
+
     queries = []
     # Primary query — always included for medium/deep
     if headline:
@@ -41,12 +51,22 @@ def _build_queries(profile: ProfileData, depth: str) -> list[str]:
     else:
         queries.append(f'"{name}"')
 
+    if depth == "medium" and company:
+        queries.append(
+            f'"{company}" recent news OR launch OR funding OR announcement'
+        )
+
     if depth == "deep":
-        # Additional queries for deep research
         if headline:
-            # Try to extract company from headline
             queries.append(f'"{name}" recent news OR announcement')
             queries.append(f'"{name}" interview OR podcast OR article')
+            if company:
+                queries.append(
+                    f'"{company}" recent news OR launch OR funding OR announcement'
+                )
+                queries.append(
+                    f'"{name}" "{company}" blog OR post OR article OR interview'
+                )
         else:
             queries.append(f'"{name}" professional')
             queries.append(f'"{name}" news')
